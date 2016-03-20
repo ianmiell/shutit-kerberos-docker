@@ -11,54 +11,42 @@ class kerberos_docker(ShutItModule):
 		shutit.send('rm -rf /tmp/kerberos_docker')
 		shutit.send('mkdir -p /tmp/kerberos_docker')
 		shutit.send('cd /tmp/kerberos_docker')
-		shutit.send('vagrant init williamyeh/centos7-docker')
+		shutit.send('vagrant init geerlingguy/centos7')
 		shutit.send('vagrant up --provider virtualbox')
 		shutit.login(command='vagrant ssh')
-		shutit.login(command='sudo su -',password='vagrant',note='Become root (there is a problem logging in as admin with the vagrant user')
-		shutit.send('yum install -y git')
-		shutit.send('git clone https://github.com:tillt/docker-kdc.git')
+		shutit.login(command='sudo su -',password='vagrant')
+		shutit.send('yum install -y docker git krb5-workstation telnet')
+		shutit.send('systemctl enable docker')
+		shutit.send('systemctl start docker')
+		shutit.send('echo "127.0.0.1   localhost.localdomain localhost4 localhost4.localdomain4" > /etc/hosts')
+		shutit.send('echo "::1         localhost.localdomain localhost6 localhost6.localdomain6" >> /etc/hosts')
+		shutit.send('git clone https://github.com/tillt/docker-kdc.git')
 		shutit.send('cd docker-kdc')
 		shutit.send('./kdc config',note='Check the configuration is sane')
-		shutit.send('./kdc build',note='Build the container')
+		shutit.send('./kdc build',note='Build the container, note the kadmin commands to set up resource')
 		shutit.send('./kdc start',note='Start up the kerberos server')
-		shutit.send('./kdc test',note='Test the server is up ok')
-#krb5-user
-#kinit tillt/osboxes.localdomain@LOCALDOMAIN
-#Password for tillt/osboxes.localdomain@LOCALDOMAIN: 
-#klist
-#cat krb5.conf
-#file krb5.keytab
-#
-#imiell@osboxes:/space/git/docker-kdc$ ktutil --keytab=./krb5.keytab list
-#ktutil:  list
-#slot KVNO Principal
-#---- ---- ---------------------------------------------------------------------
-#ktutil:  keytab
-#ktutil: Unknown request "keytab".  Type "?" for a request list.
-#ktutil:  ?
-#Available ktutil requests:
-#
-#clear_list, clear        Clear the current keylist.
-#read_kt, rkt             Read a krb5 keytab into the current keylist.
-#read_st, rst             Read a krb4 srvtab into the current keylist.
-#write_kt, wkt            Write the current keylist to a krb5 keytab.
-#write_st, wst            Write the current keylist to a krb4 srvtab.
-#add_entry, addent        Add an entry to the current keylist.
-#delete_entry, delent     Delete an entry from the current keylist.
-#list, l                  List the current keylist.
-#list_requests, lr, ?     List available requests.
-#quit, exit, q            Exit program.
-#ktutil:  read_kt krb5.keytab
-#ktutil:  l
-#slot KVNO Principal
-#---- ---- ---------------------------------------------------------------------
-#   1    1    tillt/osboxes.localdomain@LOCALDOMAIN
-#   2    1    tillt/osboxes.localdomain@LOCALDOMAIN
-#   3    1    tillt/osboxes.localdomain@LOCALDOMAIN
-#
-#kinit -kt krb5.keytab tillt/hostname.example.com@EXAMPLE.COM
-#klist
-		shutit.send('ktdestroy')
+		shutit.send_until('./kdc test','.*ok.*',note='Test the server is up ok')
+		shutit.send('$(./kdc shellinit)',note='Set up the shell so it references this dockerized kerberos server')
+		shutit.send('kinit tillt/localhost.localdomain@LOCALDOMAIN',expect='assword')
+		shutit.send('matilda')
+		shutit.send('cat krb5.conf',note='Two files are created; the first is thekrb5.conf file that we use. Normally this is in /etc')
+		shutit.send('file krb5.keytab',note='')
+		shutit.send('klist',note='List the cached kerberos tickets.')
+		shutit.send('ktutil',expect='ktutil:',note='Run the keytab utility program')
+		shutit.send('read_kt krb5.keytab',expect='ktutil:',note='Read in the keytab file.')
+		shutit.send('list',expect='ktutil:',note='List the cached kerberos tickets.')
+		shutit.send('exit',note='Quit the ktutil program')
+
+		shutit.login(command='docker exec -ti kdc bash',note='Log into the docker container')
+		shutit.send('kadmin -l add --password=teddy --use-defaults someprincipal/localhost.localdomain@LOCALDOMAIN',note='add another principal')
+		shutit.send('kadmin -l ext_keytab -k /etc/docker-kdc/someprincipal.keytab someprincipal/localhost.localdomain@LOCALDOMAIN')
+		shutit.send('kadmin -l',expect='kadmin>',note='start kadmin in local mode')
+		shutit.send('exit',note='quit kadmin')
+		shutit.logout()
+
+		shutit.send('docker cp kdc:/etc/docker-kdc/someprincipal.keytab someprincipal.keytab')
+		shutit.send('kinit someprincipal/localhost.localdomain@LOCALDOMAIN',expect='assword')
+		shutit.send('teddy')
 		shutit.send('./kdc stop',note='cleanup')
 		shutit.logout()
 		shutit.logout()
@@ -89,8 +77,8 @@ class kerberos_docker(ShutItModule):
 def module():
 	return kerberos_docker(
 		'shutit.kerberos_docker.kerberos_docker.kerberos_docker', 416177174.0001,
-		description='',
-		maintainer='',
+		description='A dockerized kerberos server and ticket interactions.',
+		maintainer='ian.miell@gmail.com',
 		delivery_methods=['bash'],
 		depends=['shutit.tk.setup']
 	)
