@@ -1,3 +1,10 @@
+# shutit-kerberos-docker
 
+Kerberos server in docker, setup of principal, authentication.
 
-https://asciinema.org/a/39965 
+```
+pip install shutit
+./run.sh
+```
+
+[![asciicast](https://asciinema.org/a/39965.png)](https://asciinema.org/a/39965)
