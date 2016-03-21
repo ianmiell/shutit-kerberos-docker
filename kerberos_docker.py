@@ -39,15 +39,15 @@ class kerberos_docker(ShutItModule):
 
 		shutit.login(command='docker exec -ti kdc bash',note='Log into the docker container')
 		shutit.send('kadmin -l add --password=teddy --use-defaults someprincipal/localhost.localdomain@LOCALDOMAIN',note='add another principal')
-		shutit.send('kadmin -l ext_keytab -k /etc/docker-kdc/someprincipal.keytab someprincipal/localhost.localdomain@LOCALDOMAIN')
-		shutit.send('kadmin -l',expect='kadmin>',note='start kadmin in local mode')
+		shutit.send('kadmin -l ext_keytab -k /etc/docker-kdc/someprincipal.keytab someprincipal/localhost.localdomain@LOCALDOMAIN',note='Create a keytab for that principal')
+		shutit.send('kadmin -l',expect='kadmin>')
 		shutit.send('exit',note='quit kadmin')
 		shutit.logout()
 
-		shutit.send('docker cp kdc:/etc/docker-kdc/someprincipal.keytab someprincipal.keytab')
-		shutit.send('kinit someprincipal/localhost.localdomain@LOCALDOMAIN',expect='assword')
+		shutit.send('docker cp kdc:/etc/docker-kdc/someprincipal.keytab someprincipal.keytab',note='Copy ')
+		shutit.send('kinit someprincipal/localhost.localdomain@LOCALDOMAIN',expect='assword',note='Log into the new principal.')
 		shutit.send('teddy')
-		shutit.send('./kdc stop',note='cleanup')
+		shutit.send('./kdc stop',note='Cleanup server')
 		shutit.logout()
 		shutit.logout()
 		return True
